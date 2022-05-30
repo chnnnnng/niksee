@@ -1,0 +1,11 @@
+This is the source code of a casual project about a Wi-Fi clock based on one single nixie tube and a serial-to-parallel shift register circuit.
+
+This commit has implemented functions include:
+- Basic time display.
+- RTC time save and read.
+- Wi-Fi connection thru SmartConfig, along with Wi-Fi configuration saved in non-volatile storage.
+- IP address display.
+- Time synchronization thru NTP server.
+- Access to MQTT server, publish and subscribe topics.  
+
+And more to come.
