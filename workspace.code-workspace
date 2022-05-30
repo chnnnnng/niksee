@@ -1,0 +1,12 @@
+{
+	"folders": [
+		{
+			"name": "Nik-see-idf",
+			"path": "."
+		},
+		{
+			"path": "../Nik-see"
+		}
+	],
+	"settings": {}
+}
