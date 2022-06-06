@@ -15,26 +15,32 @@
 #include "nixiemqtt.h"
 
 
+/**
+ * global variables declaration
+ */
+extern NixieTube tube;
+extern SimpleLED onboard_led;
+extern RtcTime& rtc;
+extern NtpTime& ntp;
+extern NixieStorage& storage;
+extern NixieNetwork& network;
+extern NixieMQTT& mqtt;
 
-class NixieClock final{
-private:
-    static NixieTube tube;
-    static SimpleLED onboard_led;
-    static RtcTime rtc;
-    static NtpTime ntp;
 
-    static TaskHandle_t nixieShowCurrentTimeTaskHandler;
-    static TaskHandle_t nixieConfigIndicationTaskHandler;
-//public interfaces
-public: 
-    static void init();
-    static void run();
-//initializers
+/**
+ * variables declaration
+ */
 
-//tasks
-private:
-    static void nixieShowCurrentTimeTask(void * pvParameters);
-    static void nixieConfigIndicationTask(void *);
-//eventHandlers
 
-};
+/**
+ * global functions declaration
+ */
+extern void NixieInit(void);
+extern void NixieRun(void);
+
+
+/**
+ * functions declaration
+ */
+void NixieShowTimeTask(void *);
+void NixieShowConfigIndicationTask(void *);

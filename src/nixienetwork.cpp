@@ -16,7 +16,7 @@ void NixieNetwork::init()
 
     auto handler = [](void* arg,esp_event_base_t event_base,int32_t event_id,void* event_data){
             NixieNetwork::instance().networkHandler(arg,event_base,event_id,event_data);
-            };
+    };
     
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, handler, NULL));
     //将IP_EVENT_STA_GOT_IP事件注册至networkHandler

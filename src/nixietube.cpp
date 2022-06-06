@@ -1,7 +1,7 @@
 #include "nixietube.h"
 
 //辉光管字形码
-const uint16_t NIXIE_DIGITs_CODE_IN12[10] = {
+constexpr uint16_t NIXIE_DIGITs_CODE_IN12[10] = {
     0b0000000000000001,
     0b0000000000000010,
     0b0000000000000100,
@@ -16,77 +16,89 @@ const uint16_t NIXIE_DIGITs_CODE_IN12[10] = {
 
 #define DIGITs_CODE NIXIE_DIGITs_CODE_IN12
 
-NixieTube::NixieTube(const gpio_num_t hv_en_pin,
+NixieTube::NixieTube(
+        const gpio_num_t hv_en_pin,
         const gpio_num_t data_pin,
         const gpio_num_t shift_pin,
         const gpio_num_t latch_pin,
         const gpio_num_t rst_n_pin)
+        :
+        hv_en_pin_(hv_en_pin),
+        sr_data_pin_(data_pin),
+        sr_shift_pin_(shift_pin),
+        sr_latch_pin_(latch_pin),
+        sr_rst_n_pin_(rst_n_pin)
 {
-    this->hv_en_pin = hv_en_pin;
-    this->sr_data_pin = data_pin;
-    this->sr_shift_pin = shift_pin;
-    this->sr_latch_pin = latch_pin;
-    this->sr_rst_n_pin = rst_n_pin;
-
-    gpio_set_direction(sr_data_pin,GPIO_MODE_OUTPUT);  
-    gpio_set_direction(sr_latch_pin,GPIO_MODE_OUTPUT);  
-    gpio_set_direction(sr_shift_pin,GPIO_MODE_OUTPUT);  
-    gpio_set_direction(sr_rst_n_pin,GPIO_MODE_OUTPUT); 
+    gpio_set_direction(sr_data_pin_,GPIO_MODE_OUTPUT);  
+    gpio_set_direction(sr_latch_pin_,GPIO_MODE_OUTPUT);  
+    gpio_set_direction(sr_shift_pin_,GPIO_MODE_OUTPUT);  
+    gpio_set_direction(sr_rst_n_pin_,GPIO_MODE_OUTPUT); 
     gpio_set_direction(hv_en_pin,GPIO_MODE_OUTPUT);
-
-    this->pwmInit();
-
-    this->disable();
-    this->reset();
+    #if TUBE_ENABLE_FADE
+    InitPWM();
+    #else
+    gpio_set_direction(hv_en_pin_,GPIO_MODE_OUTPUT);
+    #endif
+    Disable();
+    Reset();
 }
 
-void NixieTube::reset(){
-    this->gpio_pull_down_once(this->sr_rst_n_pin);
+void NixieTube::Reset(){
+    GpioPullDownOnce(sr_rst_n_pin_);
 }
 
-void NixieTube::enable(){
+void NixieTube::Enable(){
+    #if TUBE_ENABLE_FADE
     ledc_set_fade_with_time(LEDC_LS_MODE,LEDC_LS_CH0_CHANNEL,8191,20);
     ledc_fade_start(LEDC_LS_MODE,LEDC_LS_CH0_CHANNEL,LEDC_FADE_NO_WAIT);
+    #else
+    GpioPullHigh(hv_en_pin_);
+    #endif
 }
 
-void NixieTube::disable(){
+void NixieTube::Disable(){
+    #if TUBE_ENABLE_FADE
     ledc_set_fade_with_time(LEDC_LS_MODE,LEDC_LS_CH0_CHANNEL,0,20);
     ledc_fade_start(LEDC_LS_MODE,LEDC_LS_CH0_CHANNEL,LEDC_FADE_NO_WAIT);
+    #else
+    GpioPullLow(hv_en_pin_);
+    #endif
 }
 
-void NixieTube::write_16b(uint16_t data16){
+void NixieTube::Write(uint16_t data16){
   for(int i=0;i<16;i++){
     bool b = data16 & 0b1000000000000000;
     data16 <<= 1;
-    gpio_set_level(this->sr_data_pin,(uint32_t)b);
-    this->gpio_pull_up_once(this->sr_shift_pin);
-  }  
-  this->gpio_pull_up_once(this->sr_latch_pin);
+    gpio_set_level(this->sr_data_pin_, (uint32_t)b);
+    GpioPullUpOnce(sr_shift_pin_);
+  }
+  GpioPullUpOnce(sr_latch_pin_);  
 }
 
-void NixieTube::gpio_pull_down_once(gpio_num_t pin)
+void NixieTube::GpioPullDownOnce(gpio_num_t pin)
 {
     gpio_set_level(pin,0);
     gpio_set_level(pin,1);
 }
 
-void NixieTube::gpio_pull_up_once(gpio_num_t pin)
+void NixieTube::GpioPullUpOnce(gpio_num_t pin)
 {
     gpio_set_level(pin,1);
     gpio_set_level(pin,0);
 }
 
-void NixieTube::gpio_pull_high(gpio_num_t pin)
+void NixieTube::GpioPullHigh(gpio_num_t pin)
 {
     gpio_set_level(pin,1);
 }
 
-void NixieTube::gpio_pull_low(gpio_num_t pin)
+void NixieTube::GpioPullLow(gpio_num_t pin)
 {
     gpio_set_level(pin,0);
 }
 
-void NixieTube::pwmInit()
+#if TUBE_ENABLE_FADE
+void NixieTube::InitPWM()
 {
     ledc_timer_config_t ledc_timer = {
         .speed_mode = LEDC_LS_MODE,           // timer mode
@@ -111,56 +123,59 @@ void NixieTube::pwmInit()
     for (int ch = 0; ch < LEDC_TEST_CH_NUM; ch++) {
         ledc_channel_config(&ledc_channel[ch]);
     }
-    ledc_fade_func_install(ledc_intr_flag);
+    ledc_fade_func_install(ledc_intr_flag_);
+}
+#endif
+
+void NixieTube::Show(){
+    Reset();
+    Enable();
+    Write(DIGITs_CODE[digit_]);
 }
 
-void NixieTube::show(){
-    reset();
-    enable();
-    write_16b(DIGITs_CODE[this->digit]);
-}
-
-void NixieTube::show(const uint8_t & digit)
+void NixieTube::Show(const uint8_t & digit)
 {
-    this->setDigit(digit);
-    reset();
-    enable();
-    write_16b(DIGITs_CODE[this->digit]);
+    SetDigit(digit);
+    Reset();
+    Enable();
+    Write(DIGITs_CODE[digit_]);
 }
 
-void NixieTube::hide(){
-    reset();
-    write_16b(0);
-    disable();
+void NixieTube::Hide(){
+    Reset();
+    Write(0);
+    Disable();
 }
 
-void NixieTube::fadeIn()
+#if TUBE_ENABLE_FADE
+void NixieTube::FadeIn()
 {
-    reset();
-    write_16b(DIGITs_CODE[this->digit]);
+    Reset();
+    Write(DIGITs_CODE[digit_]);
     ledc_set_fade_with_time(LEDC_LS_MODE,LEDC_LS_CH0_CHANNEL,8191,500);
     ledc_fade_start(LEDC_LS_MODE,LEDC_LS_CH0_CHANNEL,LEDC_FADE_WAIT_DONE);
 }
 
-void NixieTube::fadeIn(const uint8_t & digit)
+
+void NixieTube::FadeIn(const uint8_t & digit)
 {
-    this->setDigit(digit);
-    reset();
-    write_16b(DIGITs_CODE[this->digit]);
+    SetDigit(digit);
+    Reset();
+    Write(DIGITs_CODE[digit_]);
     ledc_set_fade_with_time(LEDC_LS_MODE,LEDC_LS_CH0_CHANNEL,8191,500);
     ledc_fade_start(LEDC_LS_MODE,LEDC_LS_CH0_CHANNEL,LEDC_FADE_WAIT_DONE);
 }
 
-void NixieTube::fadeOut()
+void NixieTube::FadeOut()
 {
     ledc_set_fade_with_time(LEDC_LS_MODE,LEDC_LS_CH0_CHANNEL,0,300);
     ledc_fade_start(LEDC_LS_MODE,LEDC_LS_CH0_CHANNEL,LEDC_FADE_WAIT_DONE);
-    reset();
-    write_16b(0);
+    Reset();
+    Write(0);
 }
+#endif
 
-
-void NixieTube::detoxificate(int n){
+void NixieTube::Detoxificate(int n){
     uint8_t last = 0;
     uint8_t x = 0;
     for(int i = 0;i<n;i++){
@@ -168,60 +183,105 @@ void NixieTube::detoxificate(int n){
             x = rand()%10;
         }
         last = x;
-        show(x);
+        Show(x);
         vTaskDelay(pdMS_TO_TICKS(50));
     }
-    fadeOut();
+    #if TUBE_ENABLE_FADE
+    FadeOut();
+    #else
+    Hide();
+    #endif
 }
 
-void NixieTube::showTime(const time_t *time){
-    this->showTime(gmtime(time));
+void NixieTube::ShowTime(const time_t *time){
+    ShowTime(gmtime(time));
 }
 
-void NixieTube::showTime(const tm *time)
+#if TUBE_ENABLE_FADE
+
+void NixieTube::ShowTime(const tm *time)
 {
-    if(showTimeLock) return;
-    showTimeLock = true;
-    fadeIn(time->tm_hour/10);
-    //vTaskDelay(pdMS_TO_TICKS(500));
-    fadeOut();
-    //vTaskDelay(pdMS_TO_TICKS(100));
-    fadeIn(time->tm_hour%10);
-    //vTaskDelay(pdMS_TO_TICKS(500));
-    fadeOut();
+    FadeIn(time->tm_hour/10);
+    FadeOut();
+    FadeIn(time->tm_hour%10);
+    FadeOut();
     vTaskDelay(pdMS_TO_TICKS(300));
-    fadeIn(time->tm_min/10);
-    //vTaskDelay(pdMS_TO_TICKS(500));
-    fadeOut();
-    //vTaskDelay(pdMS_TO_TICKS(100));
-    fadeIn(time->tm_min%10);
-    //vTaskDelay(pdMS_TO_TICKS(500));
-    fadeOut();
-    showTimeLock = false;
+    FadeIn(time->tm_min/10);
+    FadeOut();
+    FadeIn(time->tm_min%10);
+    FadeOut();
 }
 
-void NixieTube::showIP(const uint8_t ip[4])
+void NixieTube::ShowIP(const uint8_t ip[4])
 {
     for(int i=0;i<4;i++){
         const uint8_t & num = ip[i];
         uint8_t h,m,l; 
         h = num/100;
         if(h != 0){
-            fadeIn(h);
-            //vTaskDelay(pdMS_TO_TICKS(500));
-            fadeOut();
+            FadeIn(h);
+            FadeOut();
             vTaskDelay(pdMS_TO_TICKS(200));
         }
         m = (num%100)/10;
         if(m != 0 || h != 0){
-            fadeIn(m);
-            //vTaskDelay(pdMS_TO_TICKS(500));
-            fadeOut();
+            FadeIn(m);
+            FadeOut();
             vTaskDelay(pdMS_TO_TICKS(200));
         }
         l = num%10;
-        fadeIn(l);
+        FadeIn(l);
         vTaskDelay(pdMS_TO_TICKS(500));
-        fadeOut();
+        FadeOut();
     }
 }
+
+#else
+
+void NixieTube::ShowTime(const tm *time)
+{
+    Show(time->tm_hour/10);
+    vTaskDelay(pdMS_TO_TICKS(500));
+    Hide();
+    vTaskDelay(pdMS_TO_TICKS(100));
+    Show(time->tm_hour%10);
+    vTaskDelay(pdMS_TO_TICKS(500));
+    Hide();
+    vTaskDelay(pdMS_TO_TICKS(300));
+    Show(time->tm_min/10);
+    vTaskDelay(pdMS_TO_TICKS(500));
+    Hide();
+    vTaskDelay(pdMS_TO_TICKS(100));
+    Show(time->tm_min%10);
+    vTaskDelay(pdMS_TO_TICKS(500));
+    Hide();
+}
+
+void NixieTube::ShowIP(const uint8_t ip[4])
+{
+    for(int i=0;i<4;i++){
+        const uint8_t & num = ip[i];
+        uint8_t h,m,l; 
+        h = num/100;
+        if(h != 0){
+            Show(h);
+            vTaskDelay(pdMS_TO_TICKS(300));
+            Hide();
+            vTaskDelay(pdMS_TO_TICKS(100));
+        }
+        m = (num%100)/10;
+        if(m != 0 || h != 0){
+            Show(m);
+            vTaskDelay(pdMS_TO_TICKS(300));
+            Hide();
+            vTaskDelay(pdMS_TO_TICKS(100));
+        }
+        l = num%10;
+        Show(l);
+        vTaskDelay(pdMS_TO_TICKS(300));
+        Hide();
+        vTaskDelay(pdMS_TO_TICKS(500));
+    }
+}
+
+#endif

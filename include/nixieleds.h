@@ -4,11 +4,11 @@
 
 class SimpleLED{
 private:
-    bool state;
-    gpio_num_t pin;
+    bool state_;
+    gpio_num_t pin_;
 public:
     SimpleLED(const gpio_num_t pin);
-    void on();
-    void off();
-    void toggle();
+    void On();
+    void Off();
+    void Toggle();
 };

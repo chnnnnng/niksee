@@ -1,36 +1,33 @@
 #include "nixieleds.h"
 
-SimpleLED::SimpleLED(const gpio_num_t pin)
+SimpleLED::SimpleLED(const gpio_num_t pin):state_(false),pin_(pin)
 {
-    this->state = false;
-    this->pin = pin;
     gpio_set_direction(pin,GPIO_MODE_OUTPUT);
     gpio_set_level(pin,0);
 }
 
-void SimpleLED::on()
+void SimpleLED::On()
 {
-    if(this->state == false) gpio_set_level(pin,1);
+    if(state_ == false) gpio_set_level(pin_,1);
     else return;
-    this->state = true;
+    state_ = true;
 }
 
-void SimpleLED::off()
+void SimpleLED::Off()
 {
-    if(this->state == true) gpio_set_level(pin,0);
+    if(state_ == true) gpio_set_level(pin_,0);
     else return;
-    this->state = false;
+    state_ = false;
 }
 
-void SimpleLED::toggle()
+void SimpleLED::Toggle()
 {
-    if(this->state == true){
-        gpio_set_level(pin,0);
-        this->state = false;
+    if(state_){
+        gpio_set_level(pin_,0);
     }else{
-        gpio_set_level(pin,1);
-        this->state = true;
+        gpio_set_level(pin_,1);
     }
+    state_ = !state_;
 }
 
 

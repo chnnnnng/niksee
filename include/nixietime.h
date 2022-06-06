@@ -19,33 +19,51 @@
 #include "esp_netif.h"
 #include "esp_sntp.h"
 
-class RtcTime{
-private:
-    tm _time;
-    i2c_dev_t _i2c_dev;
-    i2c_port_t _i2c_port = 0;
-    gpio_num_t _sda;
-    gpio_num_t _scl;
-    bool _isRunning = false;
+class RtcTime final
+{
 public:
-    RtcTime(
-         const gpio_num_t sda, 
-         const gpio_num_t scl
-         );
-    ~RtcTime();
-    bool isRunning();
-    tm * get();
-    bool set(tm time);
+    static RtcTime& instance(const gpio_num_t sda = GPIO_NUM_NC, const gpio_num_t scl = GPIO_NUM_NC) {
+        static RtcTime instance(sda,scl);
+        return instance;
+    }
+    RtcTime(const RtcTime&) = delete;
+    RtcTime& operator= (const RtcTime) = delete;
+private:
+    RtcTime(const gpio_num_t sda, const gpio_num_t scl);
+public:
+    void Deinit(void);
+    tm * Get();
+    bool Set(tm time);
+    bool IsRunning();
+private:
+    const char *TAG_ = "RtcTime";
+    esp_err_t err_;
+    tm time_;
+    i2c_dev_t i2c_dev_;
+    i2c_port_t i2c_port_ = 0;
+    gpio_num_t sda_;
+    gpio_num_t scl_;
+    bool is_running_ = false;
 };
+
 
 class NtpTime{
 public:
-    void init();
-    void obtain();
-    inline void setOnObtainedHandler(std::function<void(struct timeval *)> handler){
-        this->onObtainedHandler = handler;
+    static NtpTime& instance() {
+        static NtpTime instance;
+        return instance;
+    }
+    NtpTime(const NtpTime&) = delete;
+    NtpTime& operator= (const NtpTime) = delete;
+private:
+    NtpTime();
+public:
+    void Init();
+    void Obtain();
+    inline void SetOnObtainedHandler(std::function<void(struct timeval *)> handler){
+        this->on_obtain_handler_ = handler;
     }
 private:
-    static const char * TAG;
-    static std::function<void(struct timeval *)> onObtainedHandler;
+    const char * TAG_ = "NtpTime";
+    std::function<void(struct timeval *)> on_obtain_handler_;
 };
